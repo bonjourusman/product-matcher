@@ -1,4 +1,4 @@
-# Textual Product Matching using RAG and LLM
+# Textual Product Mapping using RAG and LLM
 
 This is an intelligent, automated system to match external products (varying product descriptions from suppliers) with internal items (inventory SKU product descriptions). The internal and external product description texts are acquired from separate CSV files.
 
@@ -15,8 +15,8 @@ This solution uses a two-step process for better accuracy:
 
 ### 2. Memory-Efficient Implementation
 
-Data processing is done in small batches to reduce memory usage for vector embeddings and for product matching
-Garbage collection is forced between processing steps
+- Data processing is done in small batches to reduce memory usage for vector embeddings and for product matching
+- Garbage collection is forced between processing steps
 
 ### 3. Size-Based Filtering
 
