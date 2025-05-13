@@ -1,4 +1,4 @@
-# Textual Product Mapping using RAG and LLM
+# Textual Product Mapping using Retrieval Augmented Generation
 
 This is an intelligent, automated system to match external products (varying product descriptions from suppliers) with internal items (inventory SKU product descriptions). The internal and external product description texts are acquired from separate CSV files.
 
