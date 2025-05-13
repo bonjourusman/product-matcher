@@ -7,31 +7,6 @@ A key criterion for matching is that it should be exact, meaning the product man
 ## Solution Architecture (High-Level)
 
 ```mermaid
-graph TD
-    subgraph "Database Creation"
-        direction LR
-        A[Load Internal Products] --> B[Preprocess Text] --> C[Generate Embeddings] --> D[Create FAISS Index] --> E[Save Vector Database]
-    end
-
-    E --> F[(Vector Database)]
-
-    subgraph "Database Update"
-        direction LR
-        G[Load Existing Database] --> H[Process New Products] --> I[Identify New Products] --> J[Generate New Embeddings] --> K[Update FAISS Index] --> L[Save Updated Database]
-    end
-
-    L --> F
-    F --> T[Load Vector Database]
-
-    subgraph "Product Matching"
-        direction LR
-        M[Load External Products] --> N[Preprocess Queries] --> O[Generate Query Embeddings] --> P[Perform Similarity Search] --> Q[Apply Size Filters] --> S[Get Best Match from LLM] --> R[Return Best Matches]
-    end
-
-    T --> M
-```
-
-```mermaid
 flowchart TD
  subgraph Creation["Database Creation"]
     direction LR

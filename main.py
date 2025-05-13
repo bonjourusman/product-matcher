@@ -62,7 +62,6 @@ def main():
     output_path = 'out/output.csv'
     
     # Parameters - Vector DB
-    embed_model_name = "all-MiniLM-L6-v2"
     top_k = 10
 
     # Parameters - LLM

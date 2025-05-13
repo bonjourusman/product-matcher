@@ -90,16 +90,16 @@ def update_vector_db():
     
     # Check command line arguments
     if len(sys.argv) < 3:
-        print("Usage: python update_vector_db.py <vector_db_path> <new_data_path> [name_column] [batch_size]")
+        print("Usage: python update_vector_db.py <new_data_path> <vector_db_path> [name_column] [batch_size]")
         sys.exit(1)
     
     # Get paths from command line
-    vector_db_path = sys.argv[1]
-    new_data_path = sys.argv[2]
+    new_data_path = sys.argv[1]
+    vector_db_path = sys.argv[2]
     
     # Get optional parameters
     name_column = 'LONG_NAME'
-    batch_size = 16  # Use a smaller default batch size for stability
+    batch_size = 32  # Use a smaller default batch size for stability
     
     if len(sys.argv) > 3:
         name_column = sys.argv[3]

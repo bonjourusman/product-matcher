@@ -87,7 +87,7 @@ class VectorDBCreator:
                     pass
             return False
     
-    def generate_embeddings_safely(self, texts, batch_size=32):
+    def generate_embeddings(self, texts, batch_size=32):
         """Generate embeddings in a safe manner, handling process isolation."""
         total_texts = len(texts)
         embedding_dim = self.embed_model.get_sentence_embedding_dimension()
