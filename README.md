@@ -12,6 +12,7 @@ A key criteria for matching is that it should be exact, meaning the product manu
    This solution uses a two-step process for better accuracy:
 
    Step 1: Vector similarity search to find the most semantically similar product candidates
+
    Step 2: LLM verification to determine exact matches based on precise criteria
 
 2. Memory-Efficient Implementation
