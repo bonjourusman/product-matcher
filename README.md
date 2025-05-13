@@ -23,6 +23,7 @@ A key criteria for matching is that it should be exact, meaning the product manu
 
 **Project Directory Structure:**
 
+```bash
 project_root/
 │
 ├── config/ # Configuration data in JSON format
@@ -40,14 +41,15 @@ project_root/
 │ ├── vector_db_module.py
 │ ├── product_matcher.py
 │ └── vector_db_updater.py
-|
+│
 ├── data/ # Data files
 │ ├── external.csv
 │ ├── internal.csv
-│ ├── internal_new.csv
+│ └── internal_new.csv
 │
 ├── main.py # Script for product matching
 ├── create_vector_db.py # Standalone script for creating vector database
 ├── update_vector_db.py # Standalone script for updating vector database
 ├── requirements.txt # Package dependencies
-├── .env # Environment file containing `OPENAI_API_KEY`
+└── .env # Environment file containing `OPENAI_API_KEY`
+```

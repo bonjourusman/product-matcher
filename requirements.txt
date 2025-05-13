@@ -1,7 +1,8 @@
-faiss_cpu==1.7.4
-numpy==2.2.5
-openai==1.78.0
+faiss_cpu==1.11.0
+numpy==1.26.4
+openai==1.77.0
 pandas==2.2.3
-python-dotenv==1.1.0
+python-dotenv==1.0.1
 sentence_transformers==4.1.0
+torch==2.1.0
 tqdm==4.67.1
