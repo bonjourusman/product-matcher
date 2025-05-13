@@ -62,7 +62,7 @@ def main():
     output_path = 'out/output.csv'
     
     # Parameters - Vector DB
-    top_k = 10
+    top_k = 20
 
     # Parameters - LLM
     llm_model = "gpt-4.1"

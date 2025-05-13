@@ -113,23 +113,42 @@ class ProductMatcher:
         return candidates
     
     def _size_filtered_candidates(self, external_product, candidates):
-        """Filter candidates based on size matching."""
+        """
+        Filter candidates based on size matching.
+        Handles both cases:
+        1. internal product name contains size info
+        2. internal product name doesn't contain size info
+        """
+
+        size_filtered_candidates = []
+    
         ext_size = extract_size_info(external_product, self.uom_dict)
-
-        if ext_size:
-            size_filtered_candidates = []
-            for c in candidates:
-                # Get size info for candidate
-                int_size = extract_size_info(c['product'], self.uom_dict)
-                
-                # If sizes are similar, keep the candidate
-                if int_size and ext_size[0] == int_size[0] and ext_size[1] == int_size[1]:
+        '''
+        # CASE 1: More sensitive (less flexibile) to size matching        
+        for c in candidates:
+            int_size = extract_size_info(c['product'], self.uom_dict)
+            if int_size: # internal product name has size info
+                if ext_size and int_size[0] == ext_size[0] and int_size[1] == ext_size[1]: # external product name has same size
                     size_filtered_candidates.append(c)
-
-            return size_filtered_candidates
-
-        else:
-            return []
+                    
+            else: # internal product name has no size info
+                if not ext_size: # external product name also has no size info
+                    size_filtered_candidates.append(c)
+        '''
+        # CASE 2: Less sensitive (more flexible) to size matching
+        for c in candidates:
+            int_size = extract_size_info(c['product'], self.uom_dict)
+            if int_size: # internal product name has size info
+                if not ext_size: # external product name has no size info
+                    size_filtered_candidates.append(c)
+                elif ext_size and int_size[0] == ext_size[0] and int_size[1] == ext_size[1]: # external product name has same size
+                    size_filtered_candidates.append(c)
+                    
+            else: # internal product name has no size info
+                if not ext_size: # external product name also has no size info
+                    size_filtered_candidates.append(c)
+        
+        return size_filtered_candidates
     
     def match_products(self, external_df):
         """
@@ -173,7 +192,7 @@ class ProductMatcher:
                 #print('Prompt Products: \n', prompt_products)
                 
                 # Prepare prompt for LLM
-                prompt = f""" Task: Match an external product name to the most appropriate internal product name based on exact matching of product manufacturer, name, and size.
+                prompt = f""" Task: Match an external product name to the most appropriate internal product name based on close matching of product manufacturer and name.
 
 External Product: {ext_product}
 
