@@ -31,6 +31,31 @@ graph TD
     T --> M
 ```
 
+```mermaid
+graph LR
+    subgraph "Database Creation"
+        direction TD
+        A[Load Internal Products] --> B[Preprocess Text] --> C[Generate Embeddings] --> D[Create FAISS Index] --> E[Save Vector Database]
+    end
+
+    E --> F[(Vector Database)]
+
+    subgraph "Database Update"
+        direction TD
+        G[Load Existing Database] --> H[Process New Products] --> I[Identify New Products] --> J[Generate New Embeddings] --> K[Update FAISS Index] --> L[Save Updated Database]
+    end
+
+    L --> F
+    F --> T[Load Vector Database]
+
+    subgraph "Product Matching"
+        direction TD
+        M[Load External Products] --> N[Preprocess Queries] --> O[Generate Query Embeddings] --> P[Perform Similarity Search] --> Q[Apply Size Filters] --> S[Get Best Match from LLM] --> R[Return Best Matches]
+    end
+
+    T --> M
+```
+
 ## Core Features of the Solution
 
 ### 1. Vector Embedding + LLM Matching
