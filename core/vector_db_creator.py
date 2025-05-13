@@ -62,8 +62,8 @@ class VectorDBCreator:
         df = self.preprocess_data(df)
         return df
     
-    def _safe_save_to_file(self, data, filepath, is_binary=True):
-        """Safely save data to a file with proper error handling."""
+    def _save_to_file(self, data, filepath, is_binary=True):
+        """Save data to a file with error handling."""
         temp_filepath = f"{filepath}.tmp"
         mode = 'wb' if is_binary else 'w'
         
@@ -87,7 +87,7 @@ class VectorDBCreator:
                     pass
             return False
     
-    def generate_embeddings(self, texts, batch_size=32):
+    def generate_embeddings_safely(self, texts, batch_size=32):
         """Generate embeddings in a safe manner, handling process isolation."""
         total_texts = len(texts)
         embedding_dim = self.embed_model.get_sentence_embedding_dimension()
@@ -104,6 +104,9 @@ class VectorDBCreator:
                 show_progress_bar=False,
                 convert_to_numpy=True,
                 batch_size=len(batch_texts),
+                # Note: setting normalize_embeddings=True is not enough
+                # because we need to re-normalize the entire array later
+                normalize_embeddings=True,
                 # Disable multiprocessing explicitly
                 num_workers=0
             )
@@ -113,72 +116,30 @@ class VectorDBCreator:
             # Explicitly force garbage collection
             gc.collect()
             
-            # Check if we've processed at least 25% of the data, save intermediate results
+            # For checkpointing, we need to normalize what we have so far
             if i > 0 and i % max(1, total_texts // 4) == 0:
-                print(f"Processed {i}/{total_texts} items. Saving checkpoint...")
-                yield embeddings[:batch_end].copy(), i
+                # Create a copy of current embeddings for checkpoint
+                current_embeddings = embeddings[:batch_end].copy()
+                
+                # Normalize the current embeddings
+                norms = np.linalg.norm(current_embeddings, axis=1, keepdims=True)
+                current_embeddings = current_embeddings / np.maximum(norms, 1e-10)  # Avoid division by zero
+                
+                # Convert to float32 for better compatibility with FAISS
+                current_embeddings = current_embeddings.astype(np.float32)
+                
+                print(f"Processed {batch_end}/{total_texts} items. Saving checkpoint...")
+                yield current_embeddings, batch_end
         
-        # Return the final embeddings
+        # Normalize final embeddings using numpy
+        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+        embeddings = embeddings / np.maximum(norms, 1e-10)  # Avoid division by zero
+        
+        # Convert to float32 for better compatibility with FAISS
+        embeddings = embeddings.astype(np.float32)
+        
+        # Return the final normalized embeddings
         yield embeddings, total_texts
-    
-    """
-    def create_vector_database(self, df, batch_size=32):
-        '''Create a FAISS vector database with internal product embeddings.'''
-        print("Creating vector database for internal products...")
-        
-        # Generate embeddings for internal products
-        texts = df['VECTOR_NAME'].tolist()
-            
-        # Initialize empty array for embeddings
-        total_texts = len(texts)
-        embedding_dim = self.embed_model.get_sentence_embedding_dimension()
-        embeddings = np.zeros((total_texts, embedding_dim), dtype=np.float32)
-        
-        try:
-            # Process in batches
-            for i in tqdm(range(0, total_texts, batch_size), desc="Generating embeddings"):
-                batch_texts = texts[i:min(i+batch_size, total_texts)]
-                
-                # Use encode with show_progress_bar=False and convert_to_numpy=True
-                # and explicitly set batch_size and normalize_embeddings
-                batch_embeddings = self.embed_model.encode(
-                    batch_texts, 
-                    show_progress_bar=False,
-                    convert_to_numpy=True,
-                    batch_size=len(batch_texts),
-                    normalize_embeddings=True,
-                    # Explicitly disable parallel encoding
-                    num_workers=0
-                )
-                
-                embeddings[i:i+len(batch_texts)] = batch_embeddings
-                
-                # Force garbage collection after each batch
-                gc.collect()
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-        except Exception as e:
-            print(f"Error during embedding generation: {e}")
-            # Clean up any remaining resources
-            gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-            raise
-        
-        # Ensure embeddings are in the right format for FAISS
-        embeddings = np.ascontiguousarray(embeddings.astype(np.float32))
-        
-        # Create FAISS index
-        vector_dimension = embeddings.shape[1]
-        index = faiss.IndexFlatIP(vector_dimension)  # Inner product for cosine similarity
-        
-        # Add embeddings to index
-        index.add(embeddings)
-        
-        print(f"Vector database created with {len(texts)} internal products")
-        
-        return embeddings, index
-    """
 
     def create_index_from_embeddings(self, embeddings):
         """Create a FAISS index from embeddings."""
@@ -206,7 +167,7 @@ class VectorDBCreator:
         }
         
         checkpoint_filepath = f"{checkpoint_path}.{checkpoint_idx}.pkl"
-        success = self._safe_save_to_file(checkpoint_data, checkpoint_filepath)
+        success = self._save_to_file(checkpoint_data, checkpoint_filepath)
         
         if success:
             print(f"Saved checkpoint {checkpoint_idx} to {checkpoint_filepath}")
@@ -291,7 +252,7 @@ class VectorDBCreator:
             if os.path.exists(f"{filepath}.pkl"):
                 os.remove(f"{filepath}.pkl")
             os.rename(temp_data_path, f"{filepath}.pkl")
-            print(f"Successfully saved data to {filepath}.pkl")
+            print(f"Successfully saved vectorized data to {filepath}.pkl")
         except Exception as e:
             print(f"Error saving vector database data: {e}")
             if os.path.exists(temp_data_path):
@@ -322,8 +283,7 @@ class VectorDBCreator:
         # Clean up any leftover temporary files
         cleanup_files = [
             f"{filepath}.pkl.tmp",
-            f"{filepath}.index.tmp",
-            f"{filepath}.data.tmp"
+            f"{filepath}.index.tmp"
         ]
         for tmp_file in cleanup_files:
             if os.path.exists(tmp_file):
@@ -351,15 +311,17 @@ class VectorDBCreator:
                 
             print(f"Looking for checkpoint files in {checkpoint_dir}...")
             
-            # Create a pattern to match checkpoint files
-            checkpoint_pattern = f"{base_name}.checkpoint"
+            # The checkpoint path pattern used in run_full_pipeline_safely
+            checkpoint_base = f"{base_name}.checkpoint"
             
-            # List all files in the directory and filter for checkpoints
+            # List all files in the directory
             all_files = os.listdir(checkpoint_dir)
-            checkpoint_files = [
-                os.path.join(checkpoint_dir, f) for f in all_files
-                if checkpoint_pattern in f and f.endswith('.pkl')
-            ]
+            
+            # Find checkpoint files with pattern like "base.checkpoint.123.pkl"
+            checkpoint_files = []
+            for f in all_files:
+                if f.startswith(checkpoint_base) and f.endswith('.pkl') and not f.endswith('.tmp'):
+                    checkpoint_files.append(os.path.join(checkpoint_dir, f))
             
             if checkpoint_files:
                 print(f"Found {len(checkpoint_files)} checkpoint files to clean up")

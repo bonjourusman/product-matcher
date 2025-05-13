@@ -1,3 +1,4 @@
+import gc
 import os
 import sys
 import json
@@ -6,18 +7,17 @@ import traceback
 from dotenv import load_dotenv, find_dotenv
 from core import VectorDBCreator
 import multiprocessing
+import torch
 
 # Add signal handler for graceful shutdown
 def signal_handler(sig, frame):
     """Handle termination signals gracefully."""
     print("\nReceived termination signal. Cleaning up...")
     # Force garbage collection
-    import gc
     gc.collect()
     
     # Clean up torch resources if available
     try:
-        import torch
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
     except:
@@ -142,12 +142,10 @@ def create_vector_db():
     
     finally:
         # Force cleanup
-        import gc
         gc.collect()
         
         # Clean up torch resources if available
         try:
-            import torch
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
         except:

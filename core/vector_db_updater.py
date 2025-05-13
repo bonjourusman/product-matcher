@@ -88,7 +88,7 @@ class VectorDBUpdater:
         return df
     
     def identify_new_products(self, new_df):
-        """Identify products that are not in the internal database."""
+        """Identify products that don't already exist in the vector database."""
         # Create sets of existing and new product names for faster comparison
         existing_products = set(self.internal_df['VECTOR_NAME'].values)
         all_new_products = set(new_df['VECTOR_NAME'].values)
@@ -102,8 +102,151 @@ class VectorDBUpdater:
         print(f"Found {len(filtered_new_df)} truly new products out of {len(new_df)} total new products")
         return filtered_new_df
     
-    def generate_embeddings(self, new_df, batch_size=16):
-        """Generate embeddings for new products."""
+    def save_checkpoint(self, new_df, new_embeddings, checkpoint_path, checkpoint_idx):
+        """Save an intermediate checkpoint during processing."""
+        os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
+        
+        checkpoint_data = {
+            'new_df': new_df,
+            'new_embeddings': new_embeddings,
+            'embedding_model_name': self.embedding_model_name,
+            'checkpoint_idx': checkpoint_idx
+        }
+        
+        # Use a consistent naming pattern for checkpoints
+        checkpoint_filepath = f"{checkpoint_path}.{checkpoint_idx}.pkl"
+        temp_path = f"{checkpoint_filepath}.tmp"
+        
+        try:
+            with open(temp_path, 'wb') as f:
+                pickle.dump(checkpoint_data, f, protocol=4)
+                f.flush()
+            
+            # Rename for atomic replacement
+            if os.path.exists(checkpoint_filepath):
+                os.remove(checkpoint_filepath)
+            os.rename(temp_path, checkpoint_filepath)
+            
+            print(f"Saved checkpoint {checkpoint_idx} to {checkpoint_filepath}")
+            return True
+        except Exception as e:
+            print(f"Error saving checkpoint: {e}")
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except:
+                    pass
+            return False
+
+    def load_latest_checkpoint(self, checkpoint_path):
+        """Load the latest checkpoint if it exists."""
+        # Find all checkpoint files
+        checkpoint_dir = os.path.dirname(checkpoint_path)
+        base_name = os.path.basename(checkpoint_path)
+        
+        if not os.path.exists(checkpoint_dir):
+            return None, None, 0
+        
+        checkpoint_files = []
+        try:
+            # The checkpoint path pattern
+            checkpoint_base = f"{base_name}.checkpoint"
+            
+            # List all files in the directory
+            all_files = os.listdir(checkpoint_dir)
+            
+            # Find checkpoint files with pattern like "base.checkpoint.123.pkl"
+            for f in all_files:
+                if f.startswith(checkpoint_base) and f.endswith('.pkl') and not f.endswith('.tmp'):
+                    checkpoint_files.append(f)
+        except Exception as e:
+            print(f"Error listing checkpoint files: {e}")
+            return None, None, 0
+        
+        if not checkpoint_files:
+            return None, None, 0
+        
+        # Sort by checkpoint index
+        try:
+            checkpoint_files.sort(key=lambda f: int(f.split('.')[-2]))
+            latest_checkpoint = os.path.join(checkpoint_dir, checkpoint_files[-1])
+        except Exception as e:
+            print(f"Error sorting checkpoint files: {e}")
+            return None, None, 0
+        
+        print(f"Loading latest checkpoint: {latest_checkpoint}")
+        
+        try:
+            with open(latest_checkpoint, 'rb') as f:
+                checkpoint_data = pickle.load(f)
+            
+            new_df = checkpoint_data.get('new_df')
+            new_embeddings = checkpoint_data.get('new_embeddings')
+            checkpoint_idx = checkpoint_data.get('checkpoint_idx', 0)
+            
+            return new_df, new_embeddings, checkpoint_idx
+        except Exception as e:
+            print(f"Error loading checkpoint: {e}")
+            return None, None, 0
+
+    def _cleanup_checkpoints(self, filepath):
+        """Clean up checkpoint files after successful save."""
+        checkpoint_dir = os.path.dirname(filepath)
+        base_name = os.path.basename(filepath)
+        
+        try:
+            # Only proceed if the directory exists
+            if not os.path.exists(checkpoint_dir):
+                return
+                
+            print(f"Looking for checkpoint files in {checkpoint_dir}...")
+            
+            # The checkpoint path pattern
+            checkpoint_base = f"{base_name}.checkpoint"
+            
+            # List all files in the directory
+            all_files = os.listdir(checkpoint_dir)
+            
+            # Find checkpoint files with pattern like "base.checkpoint.123.pkl"
+            checkpoint_files = []
+            for f in all_files:
+                if f.startswith(checkpoint_base) and f.endswith('.pkl') and not f.endswith('.tmp'):
+                    checkpoint_files.append(os.path.join(checkpoint_dir, f))
+            
+            if checkpoint_files:
+                print(f"Found {len(checkpoint_files)} checkpoint files to clean up")
+                
+                for f in checkpoint_files:
+                    try:
+                        os.remove(f)
+                        print(f"Removed checkpoint file: {f}")
+                    except Exception as e:
+                        print(f"Warning: Could not remove checkpoint file {f}: {e}")
+            else:
+                print("No checkpoint files found to clean up")
+                
+            # Also check for any temporary files that might have been left behind
+            temp_files = [
+                os.path.join(checkpoint_dir, f) for f in all_files
+                if f.endswith('.tmp')
+            ]
+            
+            for f in temp_files:
+                try:
+                    os.remove(f)
+                    print(f"Removed temporary file: {f}")
+                except Exception as e:
+                    print(f"Warning: Could not remove temporary file {f}: {e}")
+                    
+        except Exception as e:
+            print(f"Warning: Failed to clean up checkpoints: {e}")
+    
+    def generate_embeddings(self, new_df, batch_size=32):
+        """Generate embeddings with checkpointing for resilience."""
+        if len(new_df) == 0:
+            print("No new products to embed")
+            return np.array([])
+            
         print("Generating embeddings for new products...")
         
         # Generate embeddings for new products
@@ -114,49 +257,58 @@ class VectorDBUpdater:
         embedding_dim = self.embed_model.get_sentence_embedding_dimension()
         new_embeddings = np.zeros((total_texts, embedding_dim), dtype=np.float32)
         
-        try:
-            # Process in batches
-            for i in tqdm(range(0, total_texts, batch_size), desc="Generating embeddings"):
-                batch_texts = texts[i:min(i+batch_size, total_texts)]
-                
-                # Use encode with safer parameters
-                batch_embeddings = self.embed_model.encode(
-                    batch_texts, 
-                    show_progress_bar=False,
-                    convert_to_numpy=True,
-                    batch_size=len(batch_texts),
-                    normalize_embeddings=True,
-                    # Explicitly disable parallel encoding
-                    num_workers=0
-                )
-                
-                new_embeddings[i:i+len(batch_texts)] = batch_embeddings
-                
-                # Force garbage collection after each batch
-                gc.collect()
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-        except Exception as e:
-            print(f"Error during embedding generation: {e}")
-            # Clean up any remaining resources
+        # Use a smaller batch size for stability
+        for i in tqdm(range(0, total_texts, batch_size), desc="Generating embeddings"):
+            batch_end = min(i+batch_size, total_texts)
+            batch_texts = texts[i:batch_end]
+            
+            # Use a more direct approach to encoding
+            batch_embeddings = self.embed_model.encode(
+                batch_texts, 
+                show_progress_bar=False,
+                convert_to_numpy=True,
+                batch_size=len(batch_texts),
+                normalize_embeddings=True,
+                # Disable multiprocessing explicitly
+                num_workers=0
+            )
+            
+            new_embeddings[i:batch_end] = batch_embeddings
+            
+            # Explicitly force garbage collection
             gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-            raise
+            
+            # Check if we've processed at least 25% of the data, yield intermediate results
+            if i > 0 and i % max(1, total_texts // 4) == 0:
+                # Create a copy of current embeddings for checkpoint
+                current_embeddings = new_embeddings[:batch_end].copy()
+                
+                # Normalize the current embeddings
+                norms = np.linalg.norm(current_embeddings, axis=1, keepdims=True)
+                current_embeddings = current_embeddings / np.maximum(norms, 1e-10)  # Avoid division by zero
+                
+                # Convert to float32 for better compatibility with FAISS
+                current_embeddings = current_embeddings.astype(np.float32)
+                
+                print(f"Processed {batch_end}/{total_texts} items. Saving checkpoint...")
+                yield current_embeddings, batch_end
         
-        # Normalize embeddings using numpy
+        # Normalize final embeddings using numpy
         norms = np.linalg.norm(new_embeddings, axis=1, keepdims=True)
         new_embeddings = new_embeddings / np.maximum(norms, 1e-10)  # Avoid division by zero
         
         # Convert to float32 for better compatibility with FAISS
         new_embeddings = new_embeddings.astype(np.float32)
         
-        print(f"Generated embeddings for {len(texts)} new products")
-        
-        return new_embeddings
+        # Return the final normalized embeddings
+        yield new_embeddings, total_texts
     
     def update_vector_database(self, new_df, new_embeddings):
         """Update the vector database with new products."""
+        if len(new_df) == 0:
+            print("No new products to update")
+            return self.internal_df, self.internal_embeddings, self.index
+        
         print("Updating vector database...")
         
         # Combine DataFrames
@@ -237,8 +389,7 @@ class VectorDBUpdater:
         # Clean up any leftover temporary files
         cleanup_files = [
             f"{filepath}.pkl.tmp",
-            f"{filepath}.index.tmp",
-            f"{filepath}.data.tmp"
+            f"{filepath}.index.tmp"
         ]
         for tmp_file in cleanup_files:
             if os.path.exists(tmp_file):
@@ -252,38 +403,74 @@ class VectorDBUpdater:
         return True
     
     def run_update_pipeline(self, new_data_path, name_column='LONG_NAME', batch_size=16):
-        """Execute the complete pipeline for updating a vector database."""
-        # Load new data
-        print(f"Loading new data from {new_data_path}...")
-        new_df = self.load_data(new_data_path)
+        """Execute the complete pipeline for updating a vector database with checkpointing."""
+        checkpoint_path = f"{self.vector_db_filepath}.checkpoint"
         
-        # Preprocess new data
-        print("Preprocessing new data...")
-        new_df = self.preprocess_data(new_df, name_column)
+        print(f"Starting vector database update with checkpoint path: {checkpoint_path}")
         
-        # Identify new products
-        print("Identifying new products...")
-        new_products = self.identify_new_products(new_df)
+        # Try to load from checkpoint first
+        checkpoint_new_df, checkpoint_new_embeddings, checkpoint_idx = self.load_latest_checkpoint(checkpoint_path)
         
-        # If no new products, return existing data
-        if len(new_products) == 0:
-            print("No new products found")
-            return self.internal_df, self.internal_embeddings, self.index
+        # If no checkpoint, start from scratch
+        if checkpoint_new_df is None:
+            print("No checkpoint found. Starting from scratch...")
+            # Load and preprocess new data
+            new_df = self.load_data(new_data_path)
+            new_df = self.preprocess_data(new_df, name_column)
+            
+            # Identify new products
+            new_products = self.identify_new_products(new_df)
+            
+            if len(new_products) == 0:
+                print("No new products to add.")
+                return self.internal_df, self.internal_embeddings, self.index
+                
+            checkpoint_idx = 0
+        else:
+            print(f"Resuming from checkpoint with {checkpoint_idx} processed items.")
+            new_products = checkpoint_new_df
         
-        # Generate embeddings for new products
-        print("Generating embeddings for new products...")
-        new_embeddings = self.generate_embeddings(new_products, batch_size)
+        # Skip already processed embeddings if we have a checkpoint
+        if checkpoint_new_embeddings is not None and checkpoint_idx > 0:
+            # Start where we left off
+            embedding_dim = self.embed_model.get_sentence_embedding_dimension()
+            new_embeddings = np.zeros((len(new_products), embedding_dim), dtype=np.float32)
+            new_embeddings[:checkpoint_idx] = checkpoint_new_embeddings[:checkpoint_idx]
+        else:
+            # Start from the beginning
+            checkpoint_new_embeddings = None
         
-        # Update vector database
-        print("Updating vector database...")
-        updated_df, updated_embeddings, updated_index = self.update_vector_database(new_products, new_embeddings)
+        # Generate embeddings safely, potentially in chunks
+        for embeddings_chunk, processed_count in self.generate_embeddings(
+            new_products, batch_size=batch_size
+        ):
+            # If we have a checkpoint, merge with new data
+            if checkpoint_new_embeddings is not None:
+                # Update only the new part
+                total_processed = checkpoint_idx + processed_count
+                # Save a checkpoint with the combined data
+                self.save_checkpoint(new_products, embeddings_chunk, checkpoint_path, total_processed)
+            else:
+                # No checkpoint, just save the new data
+                self.save_checkpoint(new_products, embeddings_chunk, checkpoint_path, processed_count)
+                checkpoint_new_embeddings = embeddings_chunk
         
-        # Save updated vector database
-        print("Saving updated vector database...")
-        success = self.save_vector_database(updated_df, updated_embeddings, updated_index)
+        # At this point, checkpoint_new_embeddings should contain all our embeddings
+        # Update the vector database
+        updated_df, updated_embeddings, updated_index = self.update_vector_database(
+            new_products, checkpoint_new_embeddings
+        )
+        
+        # Save the updated database
+        success = self.save_vector_database(
+            updated_df, updated_embeddings, updated_index
+        )
         
         if success:
+            print("Vector database update completed successfully.")
+            # Clean up checkpoint files
+            self._cleanup_checkpoints(self.vector_db_filepath)
             return updated_df, updated_embeddings, updated_index
         else:
-            print("Failed to save updated vector database")
+            print("Failed to save updated vector database. Check the checkpoint files to recover.")
             return None, None, None
