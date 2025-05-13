@@ -1,0 +1,18 @@
+{
+  "oz": "ounce",
+  "lbs": "pound",
+  "lb": "pound",
+  "pk": "pack",
+  "ct": "count",
+  "ltr": "liter",
+  "gal": "gallon",
+  "g": "gram",
+  "gram": "gram",
+  "pt": "pint",
+  "qt": "quart",
+  "pc": "piece",
+  "piec": "piece",
+  "ml": "milliliter",
+  "stk": "stack",
+  "kg": "kilogram"
+}
