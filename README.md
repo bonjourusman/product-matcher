@@ -2,7 +2,7 @@
 
 This is an intelligent, automated system to match external products (varying product descriptions from suppliers) with internal items (inventory SKU product descriptions). The internal and external product description texts are acquired from separate CSV files.
 
-A key criteria for matching is that it should be exact, meaning the product manufacturer, name, and size must be identical.
+A key criterion for matching is that it should be exact, meaning the product manufacturer, name, and size must be identical.
 
 ## Core Features of the Solution
 
@@ -32,11 +32,6 @@ project_root/
 │ ├── uom_mappings.json
 │ └── abbr_mappings.json
 │
-├── utils/ # Shared utility functions
-│ ├── __init__.py
-│ ├── config_loader.py
-│ └── text_processing.py
-│
 ├── core/ # Core functionality modules
 │ ├── __init__.py
 │ ├── vector_db_module.py
@@ -48,7 +43,19 @@ project_root/
 │ ├── internal.csv
 │ └── internal_new.csv
 │
-├── main.py # Script for product matching
+├── db/ # Vector database
+│ ├── vector.index
+│ └── vector.pkl
+│
+├── out/ # Output mapping file
+│ └── output.csv
+│
+├── utils/ # Shared utility functions
+│ ├── __init__.py
+│ ├── config_loader.py
+│ └── text_processing.py
+│
+├── main.py # Script for product mapping
 ├── create_vector_db.py # Script for creating vector database
 ├── update_vector_db.py # Script for updating vector database
 ├── requirements.txt # Package dependencies
