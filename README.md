@@ -48,8 +48,6 @@ graph TD
     end
 
     subgraph "Utility Functions"
-        AE[Diagnostic Tools] -.-> J
-        AE -.-> V
         AF[Resource Management] -.-> F
         AF -.-> Q
         AF -.-> Z
