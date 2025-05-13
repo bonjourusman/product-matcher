@@ -6,14 +6,13 @@ This is an intelligent, automated system to match external products (varying pro
 
 A key criteria for matching is that it should be exact, meaning the product manufacturer, name, and size must be identical.
 
-**Core Features of the Solution**
+# Core Features of the Solution
 
 1. Vector Embedding + LLM Matching
    This solution uses a two-step process for better accuracy:
 
-   Step 1: Vector similarity search to find the most semantically similar product candidates
-
-   Step 2: LLM verification to determine exact matches based on precise criteria
+   - **Step 1:** Vector similarity search to find the most semantically similar product candidates
+   - **Step 2:** LLM verification to determine exact matches based on precise criteria
 
 2. Memory-Efficient Implementation
    Data processing is done in small batches to reduce memory usage for vector embeddings and for product matching
@@ -22,7 +21,7 @@ A key criteria for matching is that it should be exact, meaning the product manu
 3. Size-Based Filtering
    To improve matching accuracy from the LLM, candidates retrieved from vector search are filtered based on size similarity. In other words, only size-filtered candidates are sent to the LLM for final verification.
 
-**Project Directory Structure:**
+# Project Directory Structure:
 
 ```bash
 project_root/
@@ -49,8 +48,8 @@ project_root/
 │ └── internal_new.csv
 │
 ├── main.py # Script for product matching
-├── create_vector_db.py # Standalone script for creating vector database
-├── update_vector_db.py # Standalone script for updating vector database
+├── create_vector_db.py # Script for creating vector database
+├── update_vector_db.py # Script for updating vector database
 ├── requirements.txt # Package dependencies
 └── .env # Environment file containing `OPENAI_API_KEY`
 ```
