@@ -11,8 +11,8 @@ A key criteria for matching is that it should be exact, meaning the product manu
 1. Vector Embedding + LLM Matching
    This solution uses a two-step process for better accuracy:
 
-- Step 1: Vector similarity search to find the most semantically similar product candidates
-- Step 2: LLM verification to determine exact matches based on precise criteria
+   Step 1: Vector similarity search to find the most semantically similar product candidates
+   Step 2: LLM verification to determine exact matches based on precise criteria
 
 2. Memory-Efficient Implementation
    Data processing is done in small batches to reduce memory usage for vector embeddings and for product matching
@@ -27,17 +27,17 @@ A key criteria for matching is that it should be exact, meaning the product manu
 project_root/
 │
 ├── config/ # Configuration data in JSON format
-│ ├── **init**.py
+│ ├── __init__.py
 │ ├── uom_mappings.json
 │ └── abbr_mappings.json
 │
 ├── utils/ # Shared utility functions
-│ ├── **init**.py
+│ ├── __init__.py
 │ ├── config_loader.py
 │ └── text_processing.py
 │
 ├── core/ # Core functionality modules
-│ ├── **init**.py
+│ ├── __init__.py
 │ ├── vector_db_module.py
 │ ├── product_matcher.py
 │ └── vector_db_updater.py
