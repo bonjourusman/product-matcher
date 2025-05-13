@@ -32,28 +32,52 @@ graph TD
 ```
 
 ```mermaid
-graph LR
-    subgraph "Database Creation"
-        direction TD
-        A[Load Internal Products] --> B[Preprocess Text] --> C[Generate Embeddings] --> D[Create FAISS Index] --> E[Save Vector Database]
-    end
-
-    E --> F[(Vector Database)]
-
-    subgraph "Database Update"
-        direction TD
-        G[Load Existing Database] --> H[Process New Products] --> I[Identify New Products] --> J[Generate New Embeddings] --> K[Update FAISS Index] --> L[Save Updated Database]
-    end
-
+flowchart TD
+ subgraph Creation["Database Creation"]
+    direction LR
+        E["Save Vector Database"]
+        D["Create FAISS Index"]
+        C["Generate Embeddings"]
+        B["Preprocess Text"]
+        A["Load Internal Products"]
+  end
+ subgraph Update["Database Update"]
+    direction LR
+        L["Save Updated Database"]
+        K["Update FAISS Index"]
+        J["Generate New Embeddings"]
+        I["Identify New Products"]
+        H["Process New Products"]
+        G["Load Existing Database"]
+  end
+ subgraph Match["Product Matching"]
+    direction LR
+        R["Return Best Matches"]
+        S["Get Best Match from LLM"]
+        Q["Apply Size Filters"]
+        P["Perform Similarity Search"]
+        O["Generate Query Embeddings"]
+        N["Process External Products"]
+        M["Load Vector Database"]
+  end
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F[("Vector Database")]
+    G --> H
+    H --> I
+    I --> J
+    J --> K
+    K --> L
     L --> F
-    F --> T[Load Vector Database]
-
-    subgraph "Product Matching"
-        direction TD
-        M[Load External Products] --> N[Preprocess Queries] --> O[Generate Query Embeddings] --> P[Perform Similarity Search] --> Q[Apply Size Filters] --> S[Get Best Match from LLM] --> R[Return Best Matches]
-    end
-
-    T --> M
+    M --> N
+    N --> O
+    O --> P
+    P --> Q
+    Q --> S
+    S --> R
+    F --> M
 ```
 
 ## Core Features of the Solution
