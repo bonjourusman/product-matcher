@@ -4,7 +4,42 @@ This is an intelligent, automated system to match external products (varying pro
 
 A key criterion for matching is that it should be exact, meaning the product manufacturer, name, and size must be identical.
 
-## Solution Architecture Flowchart
+## Solution Architecture (High-Level)
+
+```mermaid
+graph TD
+    subgraph "Database Creation"
+        A[Load Internal Products] --> B[Preprocess Text]
+        B --> C[Generate Embeddings]
+        C --> D[Create FAISS Index]
+        D --> E[Save Vector Database]
+        E --> F[(Vector Database)]
+    end
+
+    subgraph "Database Update"
+        G[Load Existing Database] --> H[Process New Products]
+        H --> I[Identify New Products]
+        I --> J[Generate New Embeddings]
+        J --> K[Update FAISS Index]
+        K --> L[Save Updated Database]
+        L --> F
+    end
+
+    subgraph "Product Matching"
+        M[Load External Products] --> N[Preprocess Queries]
+        N --> O[Generate Query Embeddings]
+        O --> P[Perform Similarity Search]
+        P --> Q[Apply Size Filters]
+        Q --> S[Get Best Match from LLM]
+        S --> R[Return Best Matches]
+    end
+
+    F --> G
+    F --> T[Load Vector Database]
+    T --> M
+```
+
+## Solution Architecture (Detailed)
 
 ```mermaid
 graph TD
@@ -43,7 +78,7 @@ graph TD
         Y --> Z[Generate Query Embeddings]
         Z --> AA[Perform Vector Similarity Search]
         AA --> AB[Filter Results by Size]
-        AB --> AC[Sort by Similarity Score]
+        AB --> AC[Get Best Match from LLM]
         AC --> AD[Return Top Matches]
     end
 
